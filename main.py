@@ -1,17 +1,107 @@
-import cv2
+﻿import cv2
 import numpy as np
 
-# 读取图像并进行预处理
-image = cv2.imread('1.PNG')
-gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-edges = cv2.Canny(gray, 50, 150)
+image = cv2.imread('1.jpg')
+filtered_image = cv2.blur(image, (3, 3))
+# cv2.imshow('filtered_image', filtered_image)
+
+# Gamma值
+gamma = 0.7
+
+# 将像素值范围映射到0-1之间
+normalized_image = filtered_image / 255.0
+
+# Gamma校正
+gamma_corrected = np.power(normalized_image, gamma)
+
+# 将像素值重新映射回0-255之间
+gamma_corrected = (gamma_corrected * 255).astype(np.uint8)
+cv2.imshow('gamma_corrected', gamma_corrected)
+# cv2.imwrite('gamma.png',gamma_corrected)
+
+# 将图片转换为HSV颜色空间
+hsv_image = cv2.cvtColor(gamma_corrected, cv2.COLOR_BGR2HSV)
+
+# def on_trackbar_change(pos):
+#     # 读取滑动条的当前位置
+#     hue_min = cv2.getTrackbarPos('Hue Min', 'Color Selector')
+#     hue_max = cv2.getTrackbarPos('Hue Max', 'Color Selector')
+#     saturation_min = cv2.getTrackbarPos('Saturation Min', 'Color Selector')
+#     saturation_max = cv2.getTrackbarPos('Saturation Max', 'Color Selector')
+#     value_min = cv2.getTrackbarPos('Value Min', 'Color Selector')
+#     value_max = cv2.getTrackbarPos('Value Max', 'Color Selector')
+
+#     # 创建颜色阈值范围
+#     lower_color = np.array([hue_min, saturation_min, value_min], dtype=np.uint8)
+#     upper_color = np.array([hue_max, saturation_max, value_max], dtype=np.uint8)
+
+#     # 应用颜色阈值，获取二值图像
+#     mask = cv2.inRange(hsv_image, lower_color, upper_color)
+
+#     # 对二值图像进行形态学操作，以去除噪声或连接区域
+#     kernel = np.ones((3, 3), np.uint8)
+#     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+#     # 将二值图像与原始图像进行按位与操作，得到分割结果
+#     seg_image = cv2.bitwise_and(gamma_corrected, gamma_corrected, mask=mask)
+
+#     # 显示原始图像和分割结果
+#     cv2.imshow('Segmentation Result', seg_image)
+
+# # 创建一个窗口
+# cv2.namedWindow('Color Selector')
+
+# # 创建滑动条用于选择颜色阈值
+# cv2.createTrackbar('Hue Min', 'Color Selector', 0, 179, on_trackbar_change)
+# cv2.createTrackbar('Hue Max', 'Color Selector', 179, 179, on_trackbar_change)
+# cv2.createTrackbar('Saturation Min', 'Color Selector', 0, 255, on_trackbar_change)
+# cv2.createTrackbar('Saturation Max', 'Color Selector', 255, 255, on_trackbar_change)
+# cv2.createTrackbar('Value Min', 'Color Selector', 0, 255, on_trackbar_change)
+# cv2.createTrackbar('Value Max', 'Color Selector', 255, 255, on_trackbar_change)
+
+# # 调用一次回调函数，确保初始效果可见
+# on_trackbar_change(0)
+
+# 创建颜色阈值范围
+lower_color = np.array([0,0,211])
+upper_color = np.array([25,100,225])
+
+# 应用颜色阈值，获取二值图像
+mask = cv2.inRange(hsv_image, lower_color, upper_color)
+
+# 对二值图像进行形态学操作，以去除噪声或连接区域
+kernel = np.ones((3, 3), np.uint8)
+mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+# 将二值图像与原始图像进行按位与操作，得到分割结果
+seg_image = cv2.bitwise_and(gamma_corrected, gamma_corrected, mask=mask)
+# cv2.imshow('Segmentation Result', seg_image)
+
+# 将图像转换为灰度图像
+gray_image = cv2.cvtColor(seg_image, cv2.COLOR_BGR2GRAY)
+
+# # 对灰度图像进行二值化处理
+# threshold_value = 127  # 阈值
+# max_value = 255  # 最大值
+# _, binary_image = cv2.threshold(gray_image, threshold_value, max_value, cv2.THRESH_BINARY)
+
+# # 显示灰度图像和二值化图像
+# cv2.imshow("Gray Image", gray_image)
+# cv2.imshow("Binary Image", binary_image)
+
+edges = cv2.Canny(gray_image, 50, 150)
+cv2.imshow("edges", edges)
+
 image_height, image_width = image.shape[0],image.shape[1]
 # 轮廓检测
 contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-# print(len(contours),hierarchy)
+# print(len(contours[0]),len(contours[1]))
 
-left_contour = contours[1]
-right_contour = contours[0]
+# 按每个contour的长度从大到小排序,防止有多个contours的情况
+contours= sorted(contours, key=len, reverse=True)
+
+left_contour = contours[0]
+right_contour = contours[1]
 
 # 计算左侧轮廓的中心点
 left_moment = cv2.moments(left_contour)
@@ -41,8 +131,8 @@ if slope == 0:
     middle_point = ((left_center[0] + right_center[0]) // 2, (left_center[1] + right_center[1]) // 2)
 
     # 在图像上绘制分割线
-    line_start = (middle_point[0], 0)
-    line_end = (middle_point[0], image_height)
+    line_start = (middle_point[0], middle_point[1] - 10)
+    line_end = (middle_point[0], middle_point[1] + 10)
 else:
     # 计算质心连线的中点
     midpoint = ((left_center[0] + right_center[0]) // 2, (left_center[1] + right_center[1]) // 2)
@@ -55,7 +145,8 @@ else:
 
     # 在图像上绘制分割线
     line_start = (midpoint[0] - 10, int(midpoint[1] - 10 * line_slope))
-    line_end = (midpoint[0] + 100, int(midpoint[1] + 100 * line_slope))
+    line_end = (midpoint[0] + 10, int(midpoint[1] + 10 * line_slope))
+
 line_thickness = 1
 line_color = (255, 255, 0)  # 蓝色线条
 
@@ -67,8 +158,11 @@ cv2.line(line_image, line_start, line_end, line_color, line_thickness)
 
 # 将绘制好的直线与原始图像进行叠加
 result_image = cv2.addWeighted(image, 1, line_image, 0.5, 0)
-
 # 显示结果图像
 cv2.imshow("Result", result_image)
+
+# 等待键盘输入，按下任意键退出
 cv2.waitKey(0)
+
+# 关闭窗口
 cv2.destroyAllWindows()
